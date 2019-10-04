@@ -2,6 +2,20 @@
 using System.Collections.Generic;
 
 namespace AGAsset.StdUtil {
+	public class StubAssetInResultListener<AssetType> : AssetInResultListener<AssetType> {
+		AssetType copied;
+		void AssetInResultListener<AssetType>.OnCopyContent(AssetType _copied) {
+			copied = _copied;
+		}
+
+		void AssetInResultListener<AssetType>.OnFail() { }
+
+		void AssetInResultListener<AssetType>.OnOverwrite() { }
+
+		string AssetInResultListener<AssetType>.OnRequestPathChange(string suggetion) { return ""; }
+
+		void AssetInResultListener<AssetType>.OnSuccess() { }
+	}
 	public class SideListeningAUSupplyListener : AssetSupplyListener, AsyncCollector<AssetPick> {
 		public AssetSupplyListener mainListener;
 		public AssetSupplyListener sideListener;
