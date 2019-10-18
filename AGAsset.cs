@@ -3,17 +3,10 @@ using System.Runtime.Serialization;
 using AGDev;
 using AGBLang;
 namespace AGAsset {
-	#region asset mediator
-	public interface AssetMediator {
-		AssetType PickImplementedAsset<AssetType>(GrammarBlock gBlock);
-		void SeekAsset<AssetType>(GrammarBlock gBlock, AsyncCollector<AssetType> collLis);
-		IEnumerable<AssetType> GetImplementedAssets<AssetType>();
-	}
-	#endregion
 	#region asset implementer
 	public interface AssetSeekSupportListener<AssetType> {
-		Picker<AssetUnitInterface, AssetRequestUnit> auInterfacePicker { get; }
-		AsyncCollector<AssetType> collectorOnImplement { get; }
+		Giver<AssetUnitInterface, AssetRequestUnit> auInterfaceGiver { get; }
+		Taker<AssetType> collectorOnImplement { get; }
 	}
 	public class AssetImplementParam {
 		public AssetRequestUnit assetRrequest;
@@ -34,7 +27,7 @@ namespace AGAsset {
 	public interface AssetRequestHolder {
 		AssetRequestUnit AddOrMergeRequest_GetAdded(AssetRequestUnit newReqUnit);
 		AssetRequest request { get; }
-		ImmediatePicker<AssetRequestUnit, int> unitPicker { get; }
+		ImmediateGiver<AssetRequestUnit, int> unitGiver { get; }
 	}
 	[System.Serializable]
 	[DataContract]
@@ -78,14 +71,14 @@ namespace AGAsset {
 	public interface AssetReferer {
 		void ReferAsset(AssetUnitInfo assetUnitInfo, AssetReferenceListener listener);
 	}
-	public interface AssetInfoDatabase : ImmediatePicker<AssetUnitInfo, AssetUnitInfo>, Collector<AssetUnitInfo>, AssetUnitSupplier { }
+	public interface AssetInfoDatabase : ImmediateGiver<AssetUnitInfo, AssetUnitInfo>, Taker<AssetUnitInfo>, AssetUnitSupplier { }
 	#endregion
 	#region asset unit Integrator 
 	public interface AssetUnitIntegrateListener {
 		AssetUnitIntegrateSupport OnBeginIntegrate();
 	}
 	public interface AssetUnitIntegrateSupport {
-		Picker<AssetUnitInterface, AssetRequestUnit> integrantPicker { get; }
+		Giver<AssetUnitInterface, AssetRequestUnit> integrantGiver { get; }
 		AssetUnitInterface generatedAssetInterface { get; }
 		void OnSucceed();
 		void OnFail();
@@ -96,7 +89,7 @@ namespace AGAsset {
 	#endregion
 	#region asset supplier
 	public interface AssetSupplyListener {
-		AsyncCollector<AssetPick> supplyCollector { get; }
+		Taker<AssetPick> supplyTaker { get; }
 	}
 	public interface AssetSupplier {
 		void SupplyAsset(AssetRequest assetRequest, AssetSupplyListener listener);
@@ -105,8 +98,8 @@ namespace AGAsset {
 #endregion
 	#region asset unit supplier
 	public interface AssetUnitSupplyListener {
-		Picker<AssetUnitInterface, AssetRequestUnit> integrantPicker { get; }
-		AsyncCollector<AssetUnitInfo> supplyCollector { get; }
+		Giver<AssetUnitInterface, AssetRequestUnit> integrantGiver { get; }
+		Taker<AssetUnitInfo> supplyTaker { get; }
 	}
 	public interface AssetUnitSupplier {
 		void SupplyAssetUnit(AssetRequestUnit assetRequest, AssetUnitSupplyListener listener);
@@ -120,13 +113,13 @@ namespace AGAsset {
 		void OnOverwrite();
 		void OnFail();
 	}
-	public interface AssetBasicCollector<AssetType> {
+	public interface AssetBasicTaker<AssetType> {
 		void CollectAsset(AssetType assetType);
 		void CollectRawAsset(byte[] assetType);
 		void OnFinish();
 	}
 	public interface AssetUnitBasicOut {
-		void PickAssetAtPath<ContentType>(string path, AssetBasicCollector<ContentType> processor);
+		void PickAssetAtPath<ContentType>(string path, AssetBasicTaker<ContentType> processor);
 	}
 	public interface AssetUnitBasicIn {
 		void SetContent<ContentType>(BasicAssetInParam<ContentType> settingParam, AssetInResultListener<ContentType> listener);
@@ -137,7 +130,7 @@ namespace AGAsset {
 		AssetUnitInfo baseAssetUnitInfo { get; }
 	}
 	public interface AssetBasicIO {
-		ImmediatePicker<AssetUnitBasicIO, AssetUnitInfo> assetPicker { get; }
+		ImmediateGiver<AssetUnitBasicIO, AssetUnitInfo> assetGiver { get; }
 		string LocalizedAssetRef(AssetUnitInfo sourceAsset);
 	}
 	public class BasicAssetInParam<ContentType> {
@@ -148,7 +141,7 @@ namespace AGAsset {
 	#endregion
 	#region asset interface
 	public interface AssetReferInterface {
-		void PickContent<ContentType>(string path, AsyncCollector<ContentType> collector);
+		void PickContent<ContentType>(string path, Taker<ContentType> collector);
 	}
 	public interface AssetModifyInterface {
 		void SetContent<ContentType>(AssetContentSettingParam<ContentType> setParam, AssetInResultListener<ContentType> listener);

@@ -2,23 +2,10 @@
 using AGAsset;
 using AGDev;
 
-namespace StdUnityAGDev.StdUtil {
-    public class SQLiteLocalAssetPicker : AssetInfoDatabase {
-        void Collector<AssetUnitInfo>.Collect(AssetUnitInfo item) {
-            throw new NotImplementedException();
-        }
-
-        AssetUnitInfo ImmediatePicker<AssetUnitInfo, AssetUnitInfo>.PickBestElement(AssetUnitInfo key) {
-            throw new NotImplementedException();
-        }
-
-        void AssetUnitSupplier.SupplyAssetUnit(AssetRequestUnit assetRequest, AssetUnitSupplyListener listener) {
-            throw new NotImplementedException();
-        }
-    }
+namespace AGDevUnity.StdUtil {
 #if false
         [System.Serializable]
-	public class SQLiteLocalAssetPicker : AssetInfoDatabase {
+	public class SQLiteLocalAssetGiver : AssetInfoDatabase {
 		//public string defaultFileTemplatePath;
 		public string connectionString;
 		IDbConnection dbconn {
@@ -30,10 +17,10 @@ namespace StdUnityAGDev.StdUtil {
 		}
 		IDbConnection _dbconn;
 		string error;
-		~SQLiteLocalAssetPicker() {
+		~SQLiteLocalAssetGiver() {
 			CloseDatabase();
 		}
-		AssetUnitInfo ImmediatePicker<AssetUnitInfo, AssetUnitInfo>.PickBestElement(AssetUnitInfo key) {
+		AssetUnitInfo ImmediateGiver<AssetUnitInfo, AssetUnitInfo>.PickBestElement(AssetUnitInfo key) {
 			var sqlQueryBuilder = new System.Text.StringBuilder();
 			sqlQueryBuilder.Append("SELECT * FROM assets WHERE sname = \'" + key.shortname + "\' And creatorref = \'" + key.distributor + "\'");
 			bool hasCondition = false;
@@ -70,7 +57,7 @@ namespace StdUnityAGDev.StdUtil {
 			if (_dbconn != null) {
 				_dbconn.Close();
 				_dbconn = null;
-				GC.Collect();
+				GC.Take();
 			}
 		}
 		AssetUnitInfo RequestToAssetUnit(AssetRequestUnit reqUnit) {
@@ -122,7 +109,7 @@ namespace StdUnityAGDev.StdUtil {
 		}
 		public void AddAssetToDatabase(AssetUnitInfo localizedAssetUnitInfo) {
 			try {
-				var equivelent = (this as ImmediatePicker<AssetUnitInfo, AssetUnitInfo>).PickBestElement(localizedAssetUnitInfo);
+				var equivelent = (this as ImmediateGiver<AssetUnitInfo, AssetUnitInfo>).PickBestElement(localizedAssetUnitInfo);
 				if(equivelent != null)
 					return;
 				var sqlInsertBuilder = new System.Text.StringBuilder();
@@ -157,15 +144,15 @@ namespace StdUnityAGDev.StdUtil {
 			}
 		}
 
-		void Collector<AssetUnitInfo>.Collect(AssetUnitInfo newElement) {
+		void Taker<AssetUnitInfo>.Take(AssetUnitInfo newElement) {
 			AddAssetToDatabase(newElement);
 		}
 
 		void AssetUnitSupplier.SupplyAssetUnit(AssetRequestUnit assetRequest, AssetUnitSupplyListener listener) {
 			var assetUnit = RequestToAssetUnit(assetRequest);
 			if(assetUnit != null)
-				listener.supplyCollector.Collect(assetUnit);
-			listener.supplyCollector.OnFinish();
+				listener.supplyTaker.Take(assetUnit);
+			listener.supplyTaker.OnFinish();
 		}
 	}
 #endif

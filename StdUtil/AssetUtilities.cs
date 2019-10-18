@@ -16,17 +16,19 @@ namespace AGAsset.StdUtil {
 
 		void AssetInResultListener<AssetType>.OnSuccess() { }
 	}
-	public class SideListeningAUSupplyListener : AssetSupplyListener, AsyncCollector<AssetPick> {
+	public class SideListeningAUSupplyListener : AssetSupplyListener, Taker<AssetPick> {
 		public AssetSupplyListener mainListener;
 		public AssetSupplyListener sideListener;
-		AsyncCollector<AssetPick> AssetSupplyListener.supplyCollector => this;
-		void Collector<AssetPick>.Collect(AssetPick item) {
-			mainListener.supplyCollector.Collect(item);
-			sideListener.supplyCollector.Collect(item);
+		Taker<AssetPick> AssetSupplyListener.supplyTaker => this;
+
+		void Taker<AssetPick>.None() {
+			mainListener.supplyTaker.None();
+			sideListener.supplyTaker.None();
 		}
-		void AsyncCollector<AssetPick>.OnFinish() {
-			mainListener.supplyCollector.OnFinish();
-			sideListener.supplyCollector.OnFinish();
+
+		void Taker<AssetPick>.Take(AssetPick item) {
+			mainListener.supplyTaker.Take(item);
+			sideListener.supplyTaker.Take(item);
 		}
 	}
 	public class ClusterAUInterface : AssetUnitInterface, AssetModifyInterface, AssetReferInterface {
@@ -38,10 +40,10 @@ namespace AGAsset.StdUtil {
 
 		AssetUnitInfo AssetUnitInterface.baseAssetInfo => auInfo;
 
-		void AssetReferInterface.PickContent<ContentType>(string path, AsyncCollector<ContentType> collector) {
+		void AssetReferInterface.PickContent<ContentType>(string path, Taker<ContentType> collector) {
 			var enumerator = cluster.GetEnumerator();
 			if (enumerator.MoveNext()) {
-				enumerator.Current.referer.PickContent(path, new PrvtColl <ContentType> { path = path, clientCollector = collector, enumerator = enumerator });
+				enumerator.Current.referer.PickContent(path, new PrvtColl <ContentType> { path = path, clientTaker = collector, enumerator = enumerator });
 			}
 		}
 
@@ -49,20 +51,19 @@ namespace AGAsset.StdUtil {
 			//stub
 			listener.OnFail();
 		}
-		public class PrvtColl<ContentType> : AsyncCollector<ContentType> {
+		public class PrvtColl<ContentType> : Taker<ContentType> {
 			public string path;
-			public bool didCollect = false;
-			public AsyncCollector<ContentType> clientCollector;
+			public Taker<ContentType> clientTaker;
 			public IEnumerator<AssetUnitInterface> enumerator;
-			void Collector<ContentType>.Collect(ContentType item) {
-				clientCollector.Collect(item);
-				didCollect = true;
+			void Taker<ContentType>.Take(ContentType item) {
+				clientTaker.Take(item);
 			}
-			void AsyncCollector<ContentType>.OnFinish() {
-				if (!didCollect && enumerator.MoveNext()) {
+			void Taker<ContentType>.None() {
+				if (enumerator.MoveNext()) {
 					enumerator.Current.referer.PickContent(path, this);
-				} else {
-					clientCollector.OnFinish();
+				}
+				else {
+					clientTaker.None();
 				}
 			}
 		}
@@ -84,35 +85,30 @@ namespace AGAsset.StdUtil {
 
 		AssetUnitInfo AssetUnitInterface.baseAssetInfo => local.baseAssetInfo;
 
-		void AssetReferInterface.PickContent<ContentType>(string path, AsyncCollector<ContentType> collector) {
+		void AssetReferInterface.PickContent<ContentType>(string path, Taker<ContentType> collector) {
 			local.referer.PickContent(path, new FirstColl<ContentType> { clientColl = collector, parent = this, path = path});
 		}
-		public class FirstColl<ContentType> : AsyncCollector<ContentType> {
-			public AsyncCollector<ContentType> clientColl;
+		public class FirstColl<ContentType> : Taker<ContentType> {
+			public Taker<ContentType> clientColl;
 			public CachingAUInterface parent;
 			public string path;
-			bool didCollect = false;
-			void Collector<ContentType>.Collect(ContentType item) {
-				didCollect = true;
-				clientColl.Collect(item);
+			void Taker<ContentType>.Take(ContentType item) {
+				clientColl.Take(item);
+			}
+			void Taker<ContentType>.None() {
+				parent.remote.referer.PickContent(path, new SecondColl { clientColl = clientColl, parent = parent, path = path });
 			}
 
-			void AsyncCollector<ContentType>.OnFinish() {
-				if (!didCollect) {
-					parent.remote.referer.PickContent(path, new SecondColl { clientColl = clientColl, parent = parent, path = path });
-				}
-			}
-			public class SecondColl : AsyncCollector<ContentType> {
-				public AsyncCollector<ContentType> clientColl;
+			public class SecondColl : Taker<ContentType> {
+				public Taker<ContentType> clientColl;
 				public CachingAUInterface parent;
 				public string path;
-				void Collector<ContentType>.Collect(ContentType item) {
-					clientColl.Collect(item);
+				void Taker<ContentType>.Take(ContentType item) {
+					clientColl.Take(item);
 					parent.local.modifier.SetContent(new AssetContentSettingParam<ContentType> { content = item, contentPath = path, doOverwrite = true }, new StubAssetInResultListener<ContentType>());
 				}
-
-				void AsyncCollector<ContentType>.OnFinish() {
-					clientColl.OnFinish();
+				void Taker<ContentType>.None() {
+					clientColl.None();
 				}
 			}
 		}
@@ -130,10 +126,10 @@ namespace AGAsset.StdUtil {
 				suppliers[0].SupplyAsset(assetRequest, new PrvtSupLis {
 					clientListener = listener, suppliers = suppliers, assetRequest = assetRequest, integrantSupplier = this });
 			} else {
-				listener.supplyCollector.OnFinish();
+				listener.supplyTaker.OnFinish();
 			}
 		}
-		class PrvtSupLis : AssetSupplyListener, AsyncCollector<AssetPick> {
+		class PrvtSupLis : AssetSupplyListener, Taker<AssetPick> {
 			public AssetSupplyListener clientListener;
 			public AssetRequest assetRequest;
 			public IList<AssetSupplier> suppliers;
@@ -146,32 +142,32 @@ namespace AGAsset.StdUtil {
 					suppliers[supplierIndex].SupplyAsset(assetRequest, this);
 				} else {
 					// no one can supply
-					clientListener.supplyCollector.OnFinish();
+					clientListener.supplyTaker.OnFinish();
 				}
 			}
-			AsyncCollector<AssetPick> AssetSupplyListener.supplyCollector {
+			Taker<AssetPick> AssetSupplyListener.supplyTaker {
 				get { return this; }
 			}
 
-			void Collector<AssetPick>.Collect(AssetPick newElement) {
+			void Taker<AssetPick>.Take(AssetPick newElement) {
 				didCollect = true;
-				clientListener.supplyCollector.Collect(newElement);
+				clientListener.supplyTaker.Take(newElement);
 			}
 
-			void AsyncCollector<AssetPick>.OnFail(string reason) {
-				clientListener.supplyCollector.OnFail(reason);
+			void AsyncProcess.OnFail(string reason) {
+				clientListener.supplyTaker.OnFail(reason);
 			}
 
-			void AsyncCollector<AssetPick>.OnFinish() {
+			void AsyncProcess.OnFinish() {
 				if (!didCollect)
 					//passed
 					OnPass();
 				else
 					//collectod
-					clientListener.supplyCollector.OnFinish();
+					clientListener.supplyTaker.OnFinish();
 			}
 
-			AsyncCollector<RequestAndCollector<AssetUnitInfo>> AssetSupplyListener.OnRequestIntegrants() {
+			Taker<RequestAndTaker<AssetUnitInfo>> AssetSupplyListener.OnRequestIntegrants() {
 				return clientListener.OnRequestIntegrants();
 			}
 		}
